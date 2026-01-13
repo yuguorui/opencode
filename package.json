@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@opencode-ai/sdk",
+  "version": "1.1.16",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    },
+    "./v2": {
+      "import": "./dist/v2/index.js",
+      "types": "./dist/v2/index.d.ts"
+    },
+    "./v2/client": {
+      "import": "./dist/v2/client.js",
+      "types": "./dist/v2/client.d.ts"
+    },
+    "./v2/server": {
+      "import": "./dist/v2/server.js",
+      "types": "./dist/v2/server.d.ts"
+    }
+  },
+  "dependencies": {},
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}
