@@ -1,0 +1,90 @@
+name: sdk-gitpkg
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  gitpkg:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-bun
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Read metadata
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./packages/sdk/js/package.json').version")
+          SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+
+      - name: Check release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="@opencode-ai/sdk-${{ steps.meta.outputs.version }}-gitpkg"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release already exists: $TAG"
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "Tag already exists: $TAG"
+            exit 1
+          fi
+
+      - name: Build sdk
+        run: bun run --cwd packages/sdk/js build
+
+      - name: Prepare gitpkg exports
+        run: bun ./packages/sdk/js/script/gitpkg.ts
+
+      - name: Pack sdk
+        working-directory: packages/sdk/js
+        run: bun pm pack
+
+      - name: Rename tarball
+        id: pack
+        working-directory: packages/sdk/js
+        run: |
+          FILE=$(ls opencode-ai-sdk-*.tgz)
+          NAME="opencode-ai-sdk-${{ steps.meta.outputs.version }}-gitpkg-${{ steps.meta.outputs.sha }}.tgz"
+          mv "$FILE" "$NAME"
+          echo "tarball=$NAME" >> $GITHUB_OUTPUT
+
+      - name: Commit gitpkg
+        run: |
+          git config user.email "github-actions@users.noreply.github.com"
+          git config user.name "github-actions"
+          git add -f packages/sdk/js/dist
+          git add packages/sdk/js/package.json
+          git commit -m "chore: prepare sdk gitpkg ${{ steps.meta.outputs.version }}"
+
+      - name: Create root tag commit
+        run: |
+          git subtree split --prefix=packages/sdk/js -b sdk-gitpkg-root
+
+      - name: Tag gitpkg
+        run: |
+          TAG="@opencode-ai/sdk-${{ steps.meta.outputs.version }}-gitpkg"
+          git tag "$TAG" sdk-gitpkg-root
+          git push origin "$TAG"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="@opencode-ai/sdk-${{ steps.meta.outputs.version }}-gitpkg"
+          FILE="packages/sdk/js/${{ steps.pack.outputs.tarball }}"
+          gh release create "$TAG" "$FILE" --title "$TAG" --notes "Commit: ${{ steps.meta.outputs.sha }}"
