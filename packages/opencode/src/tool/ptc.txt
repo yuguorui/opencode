@@ -1,0 +1,89 @@
+Execute JavaScript code that can call available tools programmatically.
+
+This tool allows you to write async JavaScript code that orchestrates multiple tool calls in a single execution. All tool functions are async and return Promise<string>. Execution times out after 5 minutes.
+
+Common use cases include:
+1. Batch operations across many files (read, search, edit, write);
+2. Explore the codebase with different tools and aggregate results;
+3. Perform multi-step reasoning and tool usage in a single execution.
+
+AVAILABLE GLOBALS:
+- tools: Object containing all available tools as async functions
+- log(...args): Function to log messages (captured in output)
+- context: { sessionID, messageID, agent } - current session context
+
+TOOL NAMING:
+Tool names are sanitized: non-alphanumeric characters (except _) are replaced with _. Use ptc_list to see all available tools and their signatures. The ptc and question tools are excluded (no recursion, no interactive input).
+
+ERROR HANDLING:
+Tool calls throw on failure. Use try/catch to handle errors gracefully.
+
+EXAMPLES:
+
+1. Read and search files:
+```javascript
+const content = await tools.read({ filePath: "/path/to/file.ts" });
+const matches = await tools.grep({ pattern: "TODO", path: "./src" });
+log("Found:", matches.split("\n").length, "matches");
+return { content, matches };
+```
+
+2. Batch file operations with error handling:
+```javascript
+const files = (await tools.glob({ pattern: "src/**/*.ts" })).split("\n").filter(Boolean);
+const results = [];
+for (const file of files) {
+  try {
+    const content = await tools.read({ filePath: file });
+    if (content.includes("deprecated")) results.push(file);
+  } catch (e) {
+    log("Skipped:", file, e.message);
+  }
+}
+return { deprecatedFiles: results };
+```
+
+3. Launch parallel subagents for independent tasks:
+```javascript
+const [r1, r2] = await Promise.all([
+  tools.task({
+    description: "Review auth module",
+    prompt: "Review src/auth/ for security issues. Report findings.",
+    subagent_type: "general",
+  }),
+  tools.task({
+    description: "Review API handlers",
+    prompt: "Review src/api/ for input validation gaps. Report findings.",
+    subagent_type: "general",
+  }),
+]);
+return { auth: r1, api: r2 };
+```
+
+4. Sequential subagent pipeline (one feeds the next):
+```javascript
+const analysis = await tools.task({
+  description: "Analyze test coverage",
+  prompt: "Find all untested functions in src/. Return a list of file:function pairs.",
+  subagent_type: "general",
+});
+log("Analysis done, generating tests...");
+const result = await tools.task({
+  description: "Generate missing tests",
+  prompt: `Write tests for these untested functions:\n${analysis}`,
+  subagent_type: "general",
+});
+return result;
+```
+
+5. Aggregate search results from multiple tools:
+```javascript
+const [grep1, grep2, grep3] = await Promise.all([
+  tools.grep({ pattern: "console\\.log", path: "./src" }),
+  tools.grep({ pattern: "console\\.warn", path: "./src" }),
+  tools.grep({ pattern: "console\\.error", path: "./src" }),
+]);
+return { logs: grep1, warns: grep2, errors: grep3 };
+```
+
+The code runs in a sandboxed async context. Use 'return' to provide a final result.

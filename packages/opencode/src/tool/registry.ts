@@ -33,6 +33,7 @@ import { Glob } from "@opencode-ai/core/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
 import { Effect, Layer, Context } from "effect"
+import { makeRuntime } from "@/effect/run-service"
 import { FetchHttpClient, HttpClient } from "effect/unstable/http"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -53,6 +54,7 @@ import { Reference } from "@/reference/reference"
 import { BackgroundJob } from "@/background/job"
 import { SessionStatus } from "@/session/status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { PTCTool, PTCListTool } from "./ptc"
 
 const log = Log.create({ service: "tool.registry" })
 
@@ -133,6 +135,8 @@ export const layer: Layer.Layer<
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
+    const ptctool = yield* PTCTool
+    const ptclist = yield* PTCListTool
     const agent = yield* Agent.Service
 
     const state = yield* InstanceState.make<State>(
@@ -237,6 +241,8 @@ export const layer: Layer.Layer<
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          ptc: Tool.init(ptctool),
+          ptclist: Tool.init(ptclist),
         })
 
         return {
@@ -260,6 +266,8 @@ export const layer: Layer.Layer<
             tool.patch,
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
+            tool.ptc,
+            tool.ptclist,
           ],
           task: tool.task,
           read: tool.read,
@@ -467,6 +475,16 @@ function normalizeZodJsonSchema(value: unknown): unknown {
 
 function isJsonSchemaObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+const { runPromise } = makeRuntime(Service, defaultLayer)
+
+export async function tools(model: {
+  providerID: ProviderID
+  modelID: ModelID
+  agent: Agent.Info
+}): Promise<Tool.Def[]> {
+  return runPromise((svc) => svc.tools(model))
 }
 
 export * as ToolRegistry from "./registry"
