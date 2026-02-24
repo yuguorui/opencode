@@ -454,6 +454,8 @@ export const Assistant = Schema.Struct({
   role: Schema.Literal("assistant"),
   time: Schema.Struct({
     created: NonNegativeInt,
+    started: Schema.optional(NonNegativeInt),
+    streamed: Schema.optional(NonNegativeInt),
     completed: Schema.optional(NonNegativeInt),
   }),
   error: Schema.optional(AssistantErrorSchema),

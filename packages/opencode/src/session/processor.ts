@@ -215,6 +215,8 @@ export const layer = Layer.effect(
         switch (value.type) {
           case "start":
             yield* status.set(ctx.sessionID, { type: "busy" })
+            ctx.assistantMessage.time.started = Date.now()
+            yield* session.updateMessage(ctx.assistantMessage)
             return
 
           case "reasoning-start":
@@ -621,6 +623,8 @@ export const layer = Layer.effect(
             return
 
           case "finish":
+            ctx.assistantMessage.time.streamed = Date.now()
+            yield* session.updateMessage(ctx.assistantMessage)
             return
 
           default:
