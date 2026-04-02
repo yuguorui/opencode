@@ -1562,7 +1562,11 @@ export const layer = Layer.effect(
 
         const customFetch = options["fetch"]
         const chunkTimeout = options["chunkTimeout"]
+        const stripHeaders = options["stripHeaders"] as Record<string, string[]> | undefined
         delete options["chunkTimeout"]
+        delete options["stripHeaders"]
+
+        const effectiveStripHeaders = stripHeaders ?? {}
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const fetchFn = customFetch ?? fetch
@@ -1577,6 +1581,24 @@ export const layer = Layer.effect(
 
           const combined = signals.length === 0 ? null : signals.length === 1 ? signals[0] : AbortSignal.any(signals)
           if (combined) opts.signal = combined
+
+          if (Object.keys(effectiveStripHeaders).length > 0) {
+            const headers = opts.headers as Record<string, string> | undefined
+            if (headers) {
+              for (const [headerName, valuesToStrip] of Object.entries(effectiveStripHeaders)) {
+                if (!headers[headerName]) continue
+                const filtered = headers[headerName]
+                  .split(",")
+                  .filter((v: string) => !valuesToStrip.includes(v.trim()))
+                  .join(",")
+                if (filtered) {
+                  headers[headerName] = filtered
+                } else {
+                  delete headers[headerName]
+                }
+              }
+            }
+          }
 
           // Strip openai itemId metadata following what codex does
           if (

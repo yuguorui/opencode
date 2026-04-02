@@ -100,6 +100,12 @@ export const Info = Schema.Struct({
           description:
             "Timeout in milliseconds between streamed SSE chunks for this provider. If no chunk arrives within this window, the request is aborted.",
         }),
+        stripHeaders: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))).annotate({
+          description:
+            "Strip specific values from comma-separated request headers before sending. " +
+            "Keys are header names, values are arrays of header values to remove. " +
+            'For example, {"anthropic-beta": ["structured-outputs-2025-11-13"]} removes that beta flag from the anthropic-beta header.',
+        }),
       }),
       [Schema.Record(Schema.String, Schema.Any)],
     ),
