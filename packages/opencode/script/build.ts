@@ -228,6 +228,16 @@ for (const item of targets) {
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {
     const binaryPath = `dist/${name}/bin/opencode`
+
+    // On Apple Silicon macOS, AMFI kills binaries whose code signature does
+    // not match their contents. `bun build --compile` appends embedded assets
+    // to a pre-signed Bun runtime, which invalidates its ad-hoc signature, so
+    // re-sign before launching.
+    if (process.platform === "darwin") {
+      await $`codesign --remove-signature ${binaryPath}`.nothrow().quiet()
+      await $`codesign -s - ${binaryPath}`.quiet()
+    }
+
     console.log(`Running smoke test: ${binaryPath} --version`)
     try {
       const versionOutput = await $`${binaryPath} --version`.text()
